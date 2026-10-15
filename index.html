@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Знайди вихід з печери!</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;font-family:"Comic Sans MS",Arial,sans-serif}
+body{background:#0d0a18;color:#fff;min-height:100vh;overflow-x:hidden}
+.cave{position:fixed;inset:0;z-index:0;background:
+ radial-gradient(ellipse at 50% 120%,#2a2347,transparent 60%),
+ linear-gradient(#0a0712,#1b1530 60%,#120e22);transition:opacity 3s}
+.cave::before{content:"";position:absolute;top:0;left:0;right:0;height:90px;opacity:.5;
+ background:conic-gradient(from 160deg at 10% 0,#000 0 40deg,transparent 0) 0 0/110px 90px repeat-x,
+ conic-gradient(from 160deg at 50% 0,#000 0 30deg,transparent 0) 40px 0/160px 70px repeat-x}
+.dark{position:fixed;inset:0;z-index:1;background:#000;opacity:.6;pointer-events:none;transition:opacity 1.5s}
+.meadow{position:fixed;inset:0;z-index:2;opacity:0;transition:opacity 3.5s ease-in;pointer-events:none;
+ background:#9fd8f5 url(fon.jpg) center/cover no-repeat}
+.win .meadow{opacity:1}.win .cave,.win .dark{opacity:0}
+main{position:relative;z-index:3;max-width:1200px;margin:0 auto;padding:12px}
+h1{text-align:center;font-size:clamp(24px,4vw,36px);margin:6px 0}
+.lamps{display:flex;justify-content:center;gap:14px}
+.lamps img,.col h2 img{height:clamp(56px,10vw,84px);width:auto;display:block}
+.lamp{filter:grayscale(1) brightness(.35);transition:filter .8s,transform .8s}
+.lamp.on{filter:drop-shadow(0 0 14px #ffd84d);animation:glow 1.8s ease-in-out infinite alternate}
+@keyframes glow{to{transform:scale(1.15)}}
+.bar{height:22px;margin:10px auto;max-width:700px;background:#ffffff22;border-radius:12px;overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0;width:100%;background:#4cd964;transform-origin:left;transition:background .3s}
+.bar b{position:absolute;inset:0;text-align:center;font-size:18px;line-height:22px}
+.bar.low i{background:#ff4d4d}.bar.low b{animation:blink .5s infinite}
+@keyframes blink{50%{opacity:.3}}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:8px}
+.col{background:#ffffff14;border:3px solid #ffffff33;border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:.4s}
+.col.locked{opacity:.35;pointer-events:none}
+.col.done{border-color:#ffd84d;background:#ffd84d22}
+.col.active{border-color:#fff;box-shadow:0 0 22px #ffffff55}
+.col h2{margin:0;display:flex;align-items:center;justify-content:center;gap:10px;font-size:28px}
+button{font:inherit;font-size:24px;font-weight:bold;border:0;border-radius:14px;padding:12px;cursor:pointer;background:#ffd84d;color:#3a2a00;min-height:56px}
+button:disabled{opacity:.4;cursor:default}
+.w{background:#3b3466;color:#fff;border:2px solid #6b5fc4}
+.w:disabled{opacity:1}.w.hit{background:#ffe14d;color:#3a2a00;border-color:#fff;text-decoration:line-through}
+.w.off:not(.hit){opacity:.5}
+.col h2{font-size:24px}
+#win{display:none;text-align:center;padding:30px 10px}
+.win #win{display:block}.win .cols,.win .bar,.win h1{display:none}
+#win h2{font-size:clamp(36px,9vw,84px);color:#fff;text-shadow:0 4px 0 #2a7a1f,0 0 25px #1d5a14,0 0 8px #000;margin:40px 0 20px;animation:pop 1s ease-out}
+@keyframes pop{from{transform:scale(.2);opacity:0}}
+.win .lamps{margin-top:8px}
+</style>
+</head>
+<body>
+<div class="cave"></div><div class="dark" id="dark"></div>
+<div class="meadow" id="meadow"></div>
+<main>
+<h1>Знайди вихід з печери!</h1>
+<div class="lamps" id="lamps"></div>
+<div class="bar" id="bar"><i id="fill"></i><b id="sec">30</b></div>
+<div class="cols" id="cols"></div>
+<div id="win"><h2>Ти знайшов вихід! 🌞</h2><button onclick="location.reload()">Грати ще раз</button></div>
+</main>
+<script>
+const SETS=[
+["кіт","дім","ліс","мак","дуб","сир","сік","сом","зуб","ніс"],
+["льон","дзьоб","трьох","сьомий","сльоза","пеньок","деньок","льоток","кольори","сьогодні"],
+["сіль","день","тінь","пень","кінь","біль","нуль","мідь","лінь","міль"],
+["щука","кущ","дощ","борщ","лящ","хрущ","щока","щит","щеня","щітка"],
+["м'яч","сім'я","ім'я","п'ять","м'ята","хом'як","пір'я","п'явка","в'юн","м'ясо"]];
+const TIME=30,$=id=>document.getElementById(id);
+let lit=0,timer=null,running=-1,AC;
+const lamps=$("lamps");lamps.innerHTML=SETS.map(()=>'<img class="lamp" src="lantern.png" alt="ліхтарик">').join("");
+const cols=$("cols");
+SETS.forEach((ws,i)=>{
+ const c=document.createElement("div");c.className="col"+(i?" locked":" active");c.id="c"+i;
+ c.innerHTML=`<h2><img class="lamp" id="l${i}" src="lantern.png" alt="">${i+1}</h2><button class="go" onclick="start(${i})">Почати</button><div class="ws"></div>`;
+ cols.appendChild(c);fill(i);
+});
+function fill(i){
+ const box=$("c"+i).querySelector(".ws");box.style.cssText="display:flex;flex-direction:column;gap:8px";
+ box.innerHTML="";
+ [...SETS[i]].sort(()=>Math.random()-.5).forEach(w=>{
+  const b=document.createElement("button");b.className="w off";b.textContent=w;b.disabled=true;
+  b.onclick=()=>hit(i,b);box.appendChild(b);
+ });
+}
+function tone(f,t,d,type="sine"){
+ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+ const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;
+ o.connect(g);g.connect(AC.destination);const s=AC.currentTime+t;
+ g.gain.setValueAtTime(.2,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.start(s);o.stop(s+d);
+}
+const winSound=()=>[523,659,784,1047].forEach((f,k)=>tone(f,k*.13,.4));
+const failSound=()=>[300,220].forEach((f,k)=>tone(f,k*.2,.3,"triangle"));
+function start(i){
+ try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume()}catch(e){}
+ const c=$("c"+i);running=i;
+ c.querySelector(".go").disabled=true;
+ c.querySelectorAll(".w").forEach(b=>{b.disabled=false;b.classList.remove("off")});
+ const t0=Date.now();
+ clearInterval(timer);tick(t0);
+ timer=setInterval(()=>tick(t0),100);
+}
+function tick(t0){
+ const left=Math.max(0,TIME-(Date.now()-t0)/1000);
+ $("fill").style.transform=`scaleX(${left/TIME})`;
+ $("sec").textContent=Math.ceil(left);
+ $("bar").classList.toggle("low",left<=10);
+ if(left<=0){clearInterval(timer);fail(running)}
+}
+function reset(){$("fill").style.transform="scaleX(1)";$("sec").textContent=TIME;$("bar").classList.remove("low")}
+function hit(i,b){
+ tone(660,0,.12);b.classList.add("hit");b.disabled=true;
+ if($("c"+i).querySelectorAll(".w:not(.hit)").length==0)success(i);
+}
+function fail(i){
+ failSound();running=-1;reset();
+ const c=$("c"+i);c.querySelector(".go").disabled=false;
+ c.querySelector(".go").textContent="Ще раз";fill(i);
+}
+function success(i){
+ clearInterval(timer);running=-1;reset();winSound();lit++;
+ lamps.children[i].classList.add("on");$("l"+i).classList.add("on");
+ const c=$("c"+i);c.classList.remove("active");c.classList.add("done");c.querySelector(".go").textContent="✓ Готово";
+ $("dark").style.opacity=(.6*(1-lit/5)).toFixed(2);
+ if(lit==5){setTimeout(()=>{document.body.classList.add("win");winSound()},1200);return}
+ const n=$("c"+(i+1));n.classList.remove("locked");n.classList.add("active");
+ n.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+}
+</script>
+</body>
+</html>
